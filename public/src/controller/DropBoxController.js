@@ -1,155 +1,277 @@
 class DropBoxController {
-	constructor(database, fun) {
-		this.database = database;
-		this.func = fun;
-		this.btnSendFileEl = document.querySelector("#btn-send-file");
-		this.inputFilesEl = document.querySelector("#files");
-		this.snackModalEl = document.querySelector("#react-snackbar-root");
-		this.progressBarEl = this.snackModalEl.querySelector(".mc-progress-bar-fg");
-		this.nameFileEl = this.snackModalEl.querySelector(".filename");
-		this.timeleftEl = this.snackModalEl.querySelector(".timeleft");
-		this.listFilesEl = document.querySelector("#list-of-files-and-directories");
-		this.readFiles();
-		this.initEvents();
-	}
+  constructor(database, fun) {
+    this.database = database;
+    this.func = fun;
+    this.eventSelectionChange = new Event("selectionchange");
+    this.btnSendFileEl = document.querySelector("#btn-send-file");
+    this.inputFilesEl = document.querySelector("#files");
+    this.snackModalEl = document.querySelector("#react-snackbar-root");
+    this.progressBarEl = this.snackModalEl.querySelector(".mc-progress-bar-fg");
+    this.nameFileEl = this.snackModalEl.querySelector(".filename");
+    this.timeleftEl = this.snackModalEl.querySelector(".timeleft");
+    this.listFilesEl = document.querySelector("#list-of-files-and-directories");
+    this.btnNewFolderEl = document.querySelector("#btn-new-folder");
+    this.btnRenameEl = document.querySelector("#btn-rename");
+    this.btnDeleteEl = document.querySelector("#btn-delete");
+    this.readFiles();
+    this.initEvents();
+  }
 
-	initEvents() {
-		this.btnSendFileEl.addEventListener("click", event => {
-			this.inputFilesEl.click();
-		});
+  getSelections() {
+    return this.listFilesEl.querySelectorAll(".selected");
+  }
 
-		this.inputFilesEl.addEventListener("change", event => {
-			this.btnSendFileEl.disabled = true;
+  initEvents() {
+    this.btnDeleteEl.addEventListener("click", (event) => {
+      this.removeTasks().then((responses) => {
+        responses.forEach((response) => {
+          if (response.fields.key) {
+            this.func.remove(this.getFileRefs(response.fields.key));
+          }
+        });
+      });
+    });
 
-			this.uploadTask(event.target.files)
-				.then(responses => {
-					responses.forEach(resp => {
-						let dados = resp.files["input-file"];
-						this.func.push(this.getFilesRef(), dados);
-					});
+    this.btnRenameEl.addEventListener("click", (event) => {
+      let li = this.getSelections()[0];
+      let file = JSON.parse(li.dataset.file);
 
-					this.uploadComplete();
+      const newName = prompt("Insira um novo nome para o arquivo:", file.name);
 
-					this.btnSendFileEl.disabled = false;
-				})
-				.catch(err => {
-					this.uploadComplete();
-					console.log(err);
-				});
+      if (newName) {
+        file.name = newName;
+        this.func.set(this.getFileRefs(li.dataset.key), file);
+      } else {
+        alert("Você precisa digitar um nome para renomear o arquivo");
+      }
+    });
 
-			this.modalShow();
-		});
-	}
+    this.listFilesEl.addEventListener("selectionchange", (event) => {
+      switch (this.getSelections().length) {
+        case 0:
+          this.btnRenameEl.style.display = "none";
+          this.btnDeleteEl.style.display = "none";
+          break;
+        case 1:
+          this.btnRenameEl.style.display = "block";
+          this.btnDeleteEl.style.display = "block";
+          break;
+        default:
+          this.btnRenameEl.style.display = "none";
+      }
+    });
 
-	readFiles() {
-		this.func.onValue(this.getFilesRef(), snapshot => {
-			this.listFilesEl.innerHTML = "";
-			snapshot.forEach(snapshotItem => {
-				let key = snapshotItem.key;
-				this.listFilesEl.appendChild(this.getFileView(key, snapshotItem.val()));
-			});
-		});
-	}
+    this.btnSendFileEl.addEventListener("click", (event) => {
+      this.inputFilesEl.click();
+    });
 
-	getFilesRef() {
-		return this.func.ref(this.database, "files");
-	}
+    this.inputFilesEl.addEventListener("change", (event) => {
+      this.btnSendFileEl.disabled = true;
 
-	modalShow(show = true) {
-		this.snackModalEl.style.display = show ? "block" : "none";
-	}
+      this.uploadTask(event.target.files)
+        .then((responses) => {
+          responses.forEach((resp) => {
+            let dados = resp.files["input-file"];
+            this.func.push(this.getFilesRef(), dados);
+          });
 
-	uploadComplete() {
-		this.modalShow(false);
-		this.inputFilesEl.value = "";
-	}
+          this.uploadComplete();
+        })
+        .catch((err) => {
+          console.error(err);
+          this.uploadComplete();
+        });
 
-	uploadTask(files) {
-		let promises = [];
+      this.modalShow();
+    });
+  }
 
-		[...files].forEach(file => {
-			promises.push(
-				new Promise((resolve, reject) => {
-					let ajax = new XMLHttpRequest();
+  readFiles() {
+    this.func.onValue(this.getFilesRef(), (snapshot) => {
+      this.listFilesEl.innerHTML = "";
+      snapshot.forEach((snapshotItem) => {
+        let key = snapshotItem.key;
+        this.listFilesEl.appendChild(this.getFileView(key, snapshotItem.val()));
+      });
+    });
+  }
 
-					ajax.open("POST", "/upload");
+  getFilesRef() {
+    return this.func.ref(this.database, "files");
+  }
 
-					ajax.onload = event => {
-						this.modalShow(false);
+  getFileRefs(key) {
+    return this.func.ref(this.database, "files/" + key);
+  }
 
-						try {
-							resolve(JSON.parse(ajax.responseText));
-						} catch (e) {
-							reject(e);
-						}
-					};
+  modalShow(show = true) {
+    this.snackModalEl.style.display = show ? "block" : "none";
+  }
 
-					ajax.onerror = event => {
-						this.modalShow(false);
-						reject(event);
-					};
+  uploadComplete() {
+    this.modalShow(false);
+    this.inputFilesEl.value = "";
+    this.btnSendFileEl.disabled = false;
+  }
 
-					ajax.upload.onprogress = event => {
-						this.uploadProgress(event, file);
-					};
+  removeTasks() {
+    let promises = [];
 
-					let formData = new FormData();
+    this.getSelections().forEach((el) => {
+      let file = JSON.parse(el.dataset.file);
+      let key = el.dataset.key;
 
-					formData.append("input-file", file);
+      let formData = new FormData();
+      formData.append("path", file.path);
+      formData.append("key", key);
 
-					this.startUploadTime = Date.now();
+      promises.push(this.ajax("DELETE", "/file", formData));
+    });
 
-					ajax.send(formData);
-				})
-			);
-		});
+    return Promise.all(promises);
+  }
 
-		return Promise.all(promises);
-	}
+  uploadTask(files) {
+    let promises = [];
 
-	uploadProgress(event, file) {
-		let timespent = Date.now() - this.startUploadTime;
-		let loaded = event.loaded;
-		let total = event.total;
-		let porcent = parseInt((loaded / total) * 100);
-		let timeleft = ((100 - porcent) * timespent) / porcent;
+    [...files].forEach((file) => {
+      let formData = new FormData();
+      formData.append("input-file", file);
 
-		this.progressBarEl.style.width = `${porcent}%`;
+      promises.push(
+        this.ajax(
+          "POST",
+          "/upload",
+          formData,
+          () => {
+            this.uploadProgress(event, file);
+          },
+          () => {
+            this.startUploadTime = new Date();
+          }
+        )
+      );
+    });
 
-		this.nameFileEl.innerHTML = file.name;
-		this.timeleftEl.innerHTML = this.formatTimeToHuman(timeleft);
-	}
+    return Promise.all(promises);
+  }
 
-	formatTimeToHuman(duration) {
-		let seconds = parseInt((duration / 1000) % 60);
-		let minutes = parseInt((duration / (1000 * 60)) % 60);
-		let hours = parseInt((duration / (1000 * 60 * 60)) % 24);
+  ajax(method, route, formData = new FormData(), onuploadprogress = function () {}, startuploadtime = function () {}) {
+    return new Promise((resolve, reject) => {
+      let ajax = new XMLHttpRequest();
 
-		if (hours > 0) {
-			return `${hours} horas, ${minutes} minutos e ${seconds} segundos`;
-		}
+      ajax.open(method, route);
 
-		if (minutes > 0) {
-			return `${minutes} minutos e ${seconds} segundos`;
-		}
+      ajax.onload = (event) => {
+        try {
+          resolve(JSON.parse(ajax.responseText));
+        } catch (e) {
+          console.log("falhei!");
+          reject(e);
+        }
+      };
 
-		if (seconds > 0) {
-			return `${seconds} segundos`;
-		}
+      ajax.onerror = (event) => {
+        reject(event);
+      };
 
-		return "0 segundos restantes";
-	}
+      ajax.upload.onprogress = (event) => onuploadprogress;
 
-	initEventsLi(li) {
-		li.addEventListener("click", event => {
-			li.classList.toggle("selected");
-		});
-	}
+      startuploadtime();
 
-	getFileIconView(file) {
-		switch (file.type) {
-			case "folder":
-				return `
+      console.log("eu entrei aqui!");
+
+      ajax.send(formData);
+    });
+  }
+
+  uploadProgress(event, file) {
+    let timespent = Date.now() - this.startUploadTime;
+    let loaded = event.loaded;
+    let total = event.total;
+    let porcent = parseInt((loaded / total) * 100);
+    let timeleft = ((100 - porcent) * timespent) / porcent;
+
+    this.progressBarEl.style.width = `${porcent}%`;
+
+    this.nameFileEl.innerHTML = file.name;
+    this.timeleftEl.innerHTML = this.formatTimeToHuman(timeleft);
+  }
+
+  formatTimeToHuman(duration) {
+    let seconds = parseInt((duration / 1000) % 60);
+    let minutes = parseInt((duration / (1000 * 60)) % 60);
+    let hours = parseInt((duration / (1000 * 60 * 60)) % 24);
+
+    if (hours > 0) {
+      return `${hours} horas, ${minutes} minutos e ${seconds} segundos`;
+    }
+
+    if (minutes > 0) {
+      return `${minutes} minutos e ${seconds} segundos`;
+    }
+
+    if (seconds > 0) {
+      return `${seconds} segundos`;
+    }
+
+    return "0 segundos restantes";
+  }
+
+  initEventsLi(li) {
+    li.addEventListener("click", (event) => {
+      if (event.shiftKey) {
+        let firstLi = this.getFirstLi(li);
+        let indexStart;
+        let lastLi;
+        let liList = li.parentElement.childNodes;
+
+        liList.forEach((el, i) => {
+          if (firstLi === el) indexStart = i;
+          if (li === el) lastLi = i;
+        });
+
+        let allIndex = [indexStart, lastLi].sort();
+
+        liList.forEach((el, i) => {
+          if (i >= allIndex[0] && i <= allIndex[1]) {
+            el.classList.add("selected");
+          }
+        });
+
+        this.listFilesEl.dispatchEvent(this.eventSelectionChange);
+
+        return false;
+      }
+
+      if (!event.ctrlKey) {
+        this.clearList();
+      }
+
+      li.classList.toggle("selected");
+
+      this.listFilesEl.dispatchEvent(this.eventSelectionChange);
+    });
+  }
+
+  getFirstLi(li) {
+    let firstLi = this.listFilesEl.querySelector(".selected");
+
+    if (!firstLi) {
+      firstLi = li;
+    }
+
+    return firstLi;
+  }
+
+  clearList() {
+    this.listFilesEl.querySelectorAll(".selected").forEach((el) => el.classList.remove("selected"));
+  }
+
+  getFileIconView(file) {
+    switch (file.type) {
+      case "folder":
+        return `
         <svg width="160" height="160" viewBox="0 0 160 160" class="mc-icon-template-content tile__preview tile__preview--icon">
             <title>content-folder-large</title>
             <g fill="none" fill-rule="evenodd">
@@ -157,10 +279,10 @@ class DropBoxController {
                 <path d="M77.955 52h50.04A3.002 3.002 0 0 1 131 55.007v58.988a4.008 4.008 0 0 1-4.003 4.005H39.003A4.002 4.002 0 0 1 35 113.995V44.99c0-2.206 1.79-3.99 3.997-3.99h26.002c1.666 0 3.667 1.166 4.49 2.605l3.341 5.848s1.281 2.544 5.12 2.544l.005.003z" fill="#92CEFF"></path>
             </g>
         </svg>`;
-				break;
+        break;
 
-			case "application/pdf":
-				return `
+      case "application/pdf":
+        return `
           <svg version="1.1" id="Camada_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="160px" height="160px" viewBox="0 0 160 160" enable-background="new 0 0 160 160" xml:space="preserve">
               <filter height="102%" width="101.4%" id="mc-content-unknown-large-a" filterUnits="objectBoundingBox" y="-.5%" x="-.7%">
                 <feOffset result="shadowOffsetOuter1" in="SourceAlpha" dy="1"></feOffset>
@@ -194,11 +316,11 @@ class DropBoxController {
                 c-0.131-1.296,1.072-0.867,1.753-0.876c0.796-0.011,1.668,0.118,1.588,1.293C97.394,93.857,97.226,94.871,96.229,94.8z"></path>
           </svg>
         `;
-				break;
+        break;
 
-			case "audio/mp3":
-			case "audio/ogg":
-				return `
+      case "audio/mp3":
+      case "audio/ogg":
+        return `
         <svg width="160" height="160" viewBox="0 0 160 160" class="mc-icon-template-content tile__preview tile__preview--icon">
             <title>content-audio-large</title>
             <defs>
@@ -217,11 +339,11 @@ class DropBoxController {
             </g>
           </svg>
         `;
-				break;
+        break;
 
-			case "video/mp4":
-			case "video/quicktime":
-				return `
+      case "video/mp4":
+      case "video/quicktime":
+        return `
           <svg width="160" height="160" viewBox="0 0 160 160" class="mc-icon-template-content tile__preview tile__preview--icon">
             <title>content-video-large</title>
             <defs>
@@ -240,13 +362,13 @@ class DropBoxController {
             </g>
           </svg>
         `;
-				break;
+        break;
 
-			case "image/jpeg":
-			case "image/jpg":
-			case "image/png":
-			case "image/gif":
-				return `
+      case "image/jpeg":
+      case "image/jpg":
+      case "image/png":
+      case "image/gif":
+        return `
           <svg version="1.1" id="Camada_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="160px" height="160px" viewBox="0 0 160 160" enable-background="new 0 0 160 160" xml:space="preserve">
               <filter height="102%" width="101.4%" id="mc-content-unknown-large-a" filterUnits="objectBoundingBox" y="-.5%" x="-.7%">
                 <feOffset result="shadowOffsetOuter1" in="SourceAlpha" dy="1"></feOffset>
@@ -286,10 +408,10 @@ class DropBoxController {
               </g>
           </svg>
         `;
-				break;
+        break;
 
-			default:
-				return `
+      default:
+        return `
           <svg width="160" height="160" viewBox="0 0 160 160" class="mc-icon-template-content tile__preview tile__preview--icon">
             <title>1357054_617b.jpg</title>
             <defs>
@@ -307,20 +429,21 @@ class DropBoxController {
             </g>
           </svg>
         `;
-		}
-	}
+    }
+  }
 
-	getFileView(key, file) {
-		let li = document.createElement("li");
-		li.dataset.key = key;
+  getFileView(key, file) {
+    let li = document.createElement("li");
+    li.dataset.key = key;
+    li.dataset.file = JSON.stringify(file);
 
-		li.innerHTML = `
+    li.innerHTML = `
       ${this.getFileIconView(file)}
-      <div class="name text-center">${file.name}s</div>
+      <div class="name text-center">${file.name}</div>
     `;
 
-		this.initEventsLi(li);
+    this.initEventsLi(li);
 
-		return li;
-	}
+    return li;
+  }
 }
