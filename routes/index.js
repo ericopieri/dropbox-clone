@@ -10,7 +10,7 @@ router.get("/", function (req, res, next) {
 
 router.delete("/file", (req, res) => {
   let form = new formidable.IncomingForm({
-    uploadDir: "C:/Users/Juan Pieri/OneDrive/Área de Trabalho/Projetos/dropbox-clone/public/upload",
+    uploadDir: "C:/Users/erico/OneDrive/Área de Trabalho/Projetos/dropbox-clone/upload",
     keepExtensions: true,
   });
 
@@ -31,7 +31,7 @@ router.delete("/file", (req, res) => {
 
 router.post("/upload", (req, res) => {
   let form = new formidable.IncomingForm({
-    uploadDir: "C:/Users/Juan Pieri/OneDrive/Área de Trabalho/Projetos/dropbox-clone/public/upload",
+    uploadDir: "C:/Users/erico/OneDrive/Área de Trabalho/Projetos/dropbox-clone/upload",
     keepExtensions: true,
   });
 

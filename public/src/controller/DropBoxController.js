@@ -26,7 +26,7 @@ class DropBoxController {
       this.removeTasks().then((responses) => {
         responses.forEach((response) => {
           if (response.fields.key) {
-            this.func.remove(this.getFileRefs(respaonse.fields.key));
+            this.func.remove(this.getFileRefs(response.fields.key));
           }
         });
       });
