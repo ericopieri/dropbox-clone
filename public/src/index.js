@@ -7,6 +7,7 @@ import {
   set,
   update,
   remove,
+  off,
 } from "https://www.gstatic.com/firebasejs/9.6.5/firebase-database.js";
 
 const firebaseConfig = {
@@ -21,4 +22,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-window.app = new DropBoxController(database, { ref, push, onValue, set, update, remove });
+window.app = new DropBoxController(database, {
+  ref,
+  push,
+  onValue,
+  set,
+  update,
+  remove,
+  off,
+});

@@ -2,7 +2,11 @@ class DropBoxController {
   constructor(database, fun) {
     this.database = database;
     this.func = fun;
+    this.currentFolder = ["DropBox"];
+    this.lastFolder = undefined;
     this.eventSelectionChange = new Event("selectionchange");
+    this.navEl = document.querySelector("#browse-location");
+    this.historicoEl = document.querySelector("#browse-location");
     this.btnSendFileEl = document.querySelector("#btn-send-file");
     this.inputFilesEl = document.querySelector("#files");
     this.snackModalEl = document.querySelector("#react-snackbar-root");
@@ -13,7 +17,7 @@ class DropBoxController {
     this.btnNewFolderEl = document.querySelector("#btn-new-folder");
     this.btnRenameEl = document.querySelector("#btn-rename");
     this.btnDeleteEl = document.querySelector("#btn-delete");
-    this.readFiles();
+    this.openFolder();
     this.initEvents();
   }
 
@@ -22,11 +26,23 @@ class DropBoxController {
   }
 
   initEvents() {
+    this.btnNewFolderEl.addEventListener("click", (event) => {
+      let name = prompt("Nova pasta:");
+
+      if (name) {
+        this.func.push(this.getFilesRef(), {
+          name,
+          type: "folder",
+          path: this.currentFolder.join("/"),
+        });
+      }
+    });
+
     this.btnDeleteEl.addEventListener("click", (event) => {
       this.removeTasks().then((responses) => {
         responses.forEach((response) => {
           if (response.fields.key) {
-            this.func.remove(this.getFileRefs(response.fields.key));
+            this.func.remove(this.getFileRef(response.fields.key));
           }
         });
       });
@@ -40,7 +56,7 @@ class DropBoxController {
 
       if (newName) {
         file.name = newName;
-        this.func.set(this.getFileRefs(li.dataset.key), file);
+        this.func.set(this.getFileRef(li.dataset.key), file);
       } else {
         alert("Você precisa digitar um nome para renomear o arquivo");
       }
@@ -91,17 +107,75 @@ class DropBoxController {
       this.listFilesEl.innerHTML = "";
       snapshot.forEach((snapshotItem) => {
         let key = snapshotItem.key;
-        this.listFilesEl.appendChild(this.getFileView(key, snapshotItem.val()));
+        let data = snapshotItem.val();
+
+        if (data.type) {
+          this.listFilesEl.appendChild(this.getFileView(key, data));
+        }
       });
     });
   }
 
-  getFilesRef() {
-    return this.func.ref(this.database, "files");
+  openFolder() {
+    if (this.lastFolder) this.func.off(this.getFilesRef(this.lastFolder));
+
+    this.readFiles();
+
+    this.attHistorico();
   }
 
-  getFileRefs(key) {
-    return this.func.ref(this.database, "files/" + key);
+  attHistorico() {
+    let nav = document.createElement("nav");
+    let path = [];
+
+    this.currentFolder.forEach((folder, index) => {
+      let span = document.createElement("span");
+      path.push(folder);
+
+      if (index == this.currentFolder.length - 1) {
+        span.innerHTML = folder;
+      } else {
+        span.className = "breadcrumb-segment__wrapper";
+        span.innerHTML = `
+          <span class="ue-effect-container uee-BreadCrumbSegment-link-0">
+            <a href="#" data-path="${path.join(
+              "/"
+            )}" class="breadcrumb-segment">${folder}</a>
+          </span>
+          <svg width="24" height="24" viewBox="0 0 24 24" class="mc-icon-template-stateless" style="top: 4px; position: relative">
+            <title>arrow-right</title>
+            <path d="M10.414 7.05l4.95 4.95-4.95 4.95L9 15.534 12.536 12 9 8.464z" fill="#637282" fill-rule="evenodd"></path>
+          </svg>
+        `;
+      }
+
+      nav.appendChild(span);
+    });
+
+    this.navEl.innerHTML = nav.innerHTML;
+
+    this.initEventsRotas();
+  }
+
+  initEventsRotas() {
+    this.navEl.querySelectorAll("a").forEach((a) => {
+      a.addEventListener("click", (event) => {
+        this.lastFolder = this.currentFolder.join("/");
+        this.currentFolder = a.dataset.path.split("/");
+        this.openFolder();
+      });
+    });
+  }
+
+  getFilesRef(path = this.currentFolder.join("/")) {
+    return this.func.ref(this.database, path);
+  }
+
+  getFileRef(key) {
+    return this.func.ref(
+      this.database,
+      this.currentFolder.join("/") + "/" + key
+    );
   }
 
   modalShow(show = true) {
@@ -156,7 +230,13 @@ class DropBoxController {
     return Promise.all(promises);
   }
 
-  ajax(method, route, formData = new FormData(), onuploadprogress = function () {}, startuploadtime = function () {}) {
+  ajax(
+    method,
+    route,
+    formData = new FormData(),
+    onuploadprogress = function () {},
+    startuploadtime = function () {}
+  ) {
     return new Promise((resolve, reject) => {
       let ajax = new XMLHttpRequest();
 
@@ -219,6 +299,21 @@ class DropBoxController {
   }
 
   initEventsLi(li) {
+    li.addEventListener("dblclick", (event) => {
+      let file = JSON.parse(li.dataset.file);
+
+      switch (file.type) {
+        case "folder":
+          this.lastFolder = this.currentFolder.join("/");
+          this.currentFolder.push(file.name);
+          this.openFolder();
+          break;
+        default:
+          window.open();
+          break;
+      }
+    });
+
     li.addEventListener("click", (event) => {
       if (event.shiftKey) {
         let firstLi = this.getFirstLi(li);
@@ -265,7 +360,9 @@ class DropBoxController {
   }
 
   clearList() {
-    this.listFilesEl.querySelectorAll(".selected").forEach((el) => el.classList.remove("selected"));
+    this.listFilesEl
+      .querySelectorAll(".selected")
+      .forEach((el) => el.classList.remove("selected"));
   }
 
   getFileIconView(file) {
