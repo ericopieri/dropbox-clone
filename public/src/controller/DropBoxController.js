@@ -138,9 +138,7 @@ class DropBoxController {
         span.className = "breadcrumb-segment__wrapper";
         span.innerHTML = `
           <span class="ue-effect-container uee-BreadCrumbSegment-link-0">
-            <a href="#" data-path="${path.join(
-              "/"
-            )}" class="breadcrumb-segment">${folder}</a>
+            <a href="#" data-path="${path.join("/")}" class="breadcrumb-segment">${folder}</a>
           </span>
           <svg width="24" height="24" viewBox="0 0 24 24" class="mc-icon-template-stateless" style="top: 4px; position: relative">
             <title>arrow-right</title>
@@ -172,10 +170,7 @@ class DropBoxController {
   }
 
   getFileRef(key) {
-    return this.func.ref(
-      this.database,
-      this.currentFolder.join("/") + "/" + key
-    );
+    return this.func.ref(this.database, this.currentFolder.join("/") + "/" + key);
   }
 
   modalShow(show = true) {
@@ -230,13 +225,7 @@ class DropBoxController {
     return Promise.all(promises);
   }
 
-  ajax(
-    method,
-    route,
-    formData = new FormData(),
-    onuploadprogress = function () {},
-    startuploadtime = function () {}
-  ) {
+  ajax(method, route, formData = new FormData(), onuploadprogress = function () {}, startuploadtime = function () {}) {
     return new Promise((resolve, reject) => {
       let ajax = new XMLHttpRequest();
 
@@ -246,7 +235,6 @@ class DropBoxController {
         try {
           resolve(JSON.parse(ajax.responseText));
         } catch (e) {
-          console.log("falhei!");
           reject(e);
         }
       };
@@ -258,8 +246,6 @@ class DropBoxController {
       ajax.upload.onprogress = (event) => onuploadprogress;
 
       startuploadtime();
-
-      console.log("eu entrei aqui!");
 
       ajax.send(formData);
     });
@@ -309,7 +295,7 @@ class DropBoxController {
           this.openFolder();
           break;
         default:
-          window.open();
+          window.open("/file?path=" + file.path);
           break;
       }
     });
@@ -360,9 +346,7 @@ class DropBoxController {
   }
 
   clearList() {
-    this.listFilesEl
-      .querySelectorAll(".selected")
-      .forEach((el) => el.classList.remove("selected"));
+    this.listFilesEl.querySelectorAll(".selected").forEach((el) => el.classList.remove("selected"));
   }
 
   getFileIconView(file) {
